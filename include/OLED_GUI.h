@@ -74,10 +74,10 @@ void GUI_DisString_EN(POINT Xstart, POINT Ystart, const char * pString, sFONT* F
 void GUI_DisNum(POINT Xpoint, POINT Ypoint, int32_t Nummber, sFONT* Font, COLOR Color_Background, COLOR Color_Foreground );
 // Images
 void DisSelfTest(void);
-void MenuPage1_Auto_On(void);
-void MenuPage2_Auto_On(void);
-void MenuPage1_Auto_Off(void);
-void MenuPage2_Auto_Off(void);
+void MenuPage1_Auto_On(int SetTemp);
+void MenuPage2_Auto_On(int SetTemp);
+void MenuPage1_Auto_Off(int SetTemp);
+void MenuPage2_Auto_Off(int SetTemp);
 void DisTemp(int temp);
 void DisCurrent(int current);
 void DrawError(void);

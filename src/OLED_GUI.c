@@ -15,7 +15,7 @@ void DisSelfTest(void)
 	OLED_Display();
 }
 
-void MenuPage1_Auto_On(void)
+void MenuPage1_Auto_On(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
@@ -25,10 +25,16 @@ void MenuPage1_Auto_On(void)
 	GUI_DisString_EN(0, 6, "Auto Mode:", &Font16,WHITE, BLACK );
 	GUI_Disbitmap(112, 6, Very_Basic_Accept_icon, PX_16, PX_16);
 	GUI_DisString_EN(0, 24, "Self Test", &Font16,BLACK, WHITE );
+	GUI_Disbitmap(38, 40, flame_icon, PX_16, PX_16);
+	GUI_DisChar(56,40,':',&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DisString_EN(0,40, "Set ",&Font16,BLACK, WHITE);
+	GUI_DisNum(66,40,SetTemp,&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DrawPoint(106,40,WHITE,DOT_PIXEL_2X2,DOT_FILL_AROUND);
+	GUI_DisChar(108,40,TEMP_Symbol,&Font16,FONT_BACKGROUND, WHITE);
 	OLED_Display();
 }
 
-void MenuPage2_Auto_On(void)
+void MenuPage2_Auto_On(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
@@ -38,10 +44,16 @@ void MenuPage2_Auto_On(void)
 	GUI_DisString_EN(0, 6, "Auto Mode:", &Font16,BLACK, WHITE );
 	GUI_Disbitmap(112, 6, Very_Basic_Accept_icon, PX_16, PX_16);
 	GUI_DisString_EN(0, 24, "Self Test", &Font16,WHITE, BLACK );
+	GUI_Disbitmap(38, 40, flame_icon, PX_16, PX_16);
+	GUI_DisChar(56,40,':',&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DisString_EN(0,40, "Set ",&Font16,BLACK, WHITE);
+	GUI_DisNum(66,40,SetTemp,&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DrawPoint(106,40,WHITE,DOT_PIXEL_2X2,DOT_FILL_AROUND);
+	GUI_DisChar(108,40,TEMP_Symbol,&Font16,FONT_BACKGROUND, WHITE);
 	OLED_Display();
 }
 
-void MenuPage1_Auto_Off(void)
+void MenuPage1_Auto_Off(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
@@ -51,10 +63,16 @@ void MenuPage1_Auto_Off(void)
 	GUI_DisString_EN(0, 6, "Auto Mode:", &Font16,WHITE, BLACK);
 	GUI_Disbitmap(112, 6, Very_Basic_Cancel_icon, PX_16, PX_16);
 	GUI_DisString_EN(0, 24, "Self Test", &Font16,BLACK, WHITE  );
+	GUI_Disbitmap(38, 40, flame_icon, PX_16, PX_16);
+	GUI_DisChar(56,40,':',&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DisString_EN(0,40, "Set ",&Font16,BLACK, WHITE);
+	GUI_DisNum(66,40,SetTemp,&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DrawPoint(106,40,WHITE,DOT_PIXEL_2X2,DOT_FILL_AROUND);
+	GUI_DisChar(108,40,TEMP_Symbol,&Font16,FONT_BACKGROUND, WHITE);
 	OLED_Display();
 }
 
-void MenuPage2_Auto_Off(void)
+void MenuPage2_Auto_Off(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
@@ -64,6 +82,12 @@ void MenuPage2_Auto_Off(void)
 	GUI_DisString_EN(0, 6, "Auto Mode:", &Font16,BLACK, WHITE );
 	GUI_Disbitmap(112, 6, Very_Basic_Cancel_icon, PX_16, PX_16);
 	GUI_DisString_EN(0, 24, "Self Test", &Font16,WHITE, BLACK);
+	GUI_Disbitmap(38, 40, flame_icon, PX_16, PX_16);
+	GUI_DisChar(56,40,':',&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DisString_EN(0,40, "Set ",&Font16,BLACK, WHITE);
+	GUI_DisNum(66,40,SetTemp,&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DrawPoint(106,40,WHITE,DOT_PIXEL_2X2,DOT_FILL_AROUND);
+	GUI_DisChar(108,40,TEMP_Symbol,&Font16,FONT_BACKGROUND, WHITE);
 	OLED_Display();
 }
 

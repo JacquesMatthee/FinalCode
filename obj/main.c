@@ -71,9 +71,12 @@ int flag = 0;
 volatile int Menu = 0;
 volatile int Temp = 100;
 volatile int Current = 50;
-volatile int AutoMode = 1 ;
+volatile int AutoMode = 0 ;
 volatile int MenuItem = 0;
 volatile int SelfTest = 0;
+
+volatile bool Power = false;
+volatile bool CloudConnection = false;
 
 
 /* Variables end */ 
@@ -110,9 +113,6 @@ void Key2_Interrupt();
 void Key3_Interrupt();
 void KeyUp_Interrupt();
 void KeyDown_Interrupt();
-void KeyLeft_Interrupt();
-void KeyRight_Interrupt();
-void KeyPress_Interrupt();
 
 void GetTime();
 
@@ -180,8 +180,7 @@ int main(int argc, char **argv) {
 /*******************************************************************************/
 /* Functions Begin */
 
-void GetTime()
-{
+void GetTime(){
 	OLED_Clear(OLED_BACKGROUND);
 	OLED_Display();
 	time(&now);
@@ -192,9 +191,8 @@ void GetTime()
 	GUI_DisChar(48+18, 22, value[timenow->tm_min / 10],  &Font24, FONT_BACKGROUND, WHITE);
 	GUI_DisChar(64+18, 22, value[timenow->tm_min % 10],  &Font24, FONT_BACKGROUND, WHITE);
 	
-	DrawConCloud();
-	DrawSystemPower();
-	DrawComs();
+	//DrawConCloud();
+	//DrawComs();
 	
 	if (AutoMode == 1)
 	{
@@ -204,30 +202,41 @@ void GetTime()
 	{
 		DrawAutoModeOff();
 	}
+	if (Power)
+	{
+		DrawSystemPower();
+	}
+	if (CloudConnection)
+	{
+		DrawConCloud();
+	}
 	
 	//DrawAutoModeOn();
-	DrawError();
-	DisTemp(Temp);
+	//DrawError();
+	DisTemp(SetTemperature);
 	DisCurrent(Current);
 	
 	OLED_Display();
 	Driver_Delay_ms(oled_delay+4000);
 }
 
-
 void Setup_OLED(){
 	if(System_Init())
 	{
 		exit(0);
 	}
+	SetupISR();
+	Power = true;
 	OLED_SCAN_DIR OLED_ScanDir = SCAN_DIR_DFT;//SCAN_DIR_DFT = D2U_L2R
 	OLED_Init(OLED_ScanDir );
 	printf("OLED Show \r\n");
 	OLED_Clear(0x00);
-	DrawSystemPower();
+	if (Power)
+	{
+		DrawSystemPower();
+	}
 	OLED_Display();
 }
-
 
 IoT_Error_t AWS_Shadow_Reported_Send(){
 	if (NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc) 
@@ -279,12 +288,12 @@ void Key1_Interrupt()
 	Menu = 1;
 	if (AutoMode == 1)
 	{
-		MenuPage1_Auto_On();
+		MenuPage1_Auto_On(SetTemperature);
 		MenuItem = 0;
 	}
 	else if (AutoMode == 0)
 	{
-		MenuPage1_Auto_Off();
+		MenuPage1_Auto_Off(SetTemperature);
 		MenuItem = 0;
 	}
 }
@@ -332,12 +341,12 @@ void KeyUp_Interrupt()
 	//Menu = 1;
 	if (AutoMode == 1 && Menu == 1)
 	{
-		MenuPage1_Auto_On();
+		MenuPage1_Auto_On(SetTemperature);
 		MenuItem = 0;
 	}
 	else if (AutoMode == 0 && Menu == 1)
 	{
-		MenuPage1_Auto_Off();
+		MenuPage1_Auto_Off(SetTemperature);
 		MenuItem = 0;
 	}
 
@@ -348,34 +357,16 @@ void KeyDown_Interrupt()
 	//Menu = 1;
 	if (AutoMode == 1 && Menu == 1)
 	{
-		MenuPage2_Auto_On();
+		MenuPage2_Auto_On(SetTemperature);
 		MenuItem = 1;
 	}
 	else if (AutoMode == 0 && Menu == 1)
 	{
-		MenuPage2_Auto_Off();
+		MenuPage2_Auto_Off(SetTemperature);
 		MenuItem = 1;
 	}
 	//MenuPage2_Auto_Off();
 }
-
-void KeyLeft_Interrupt()
-{
-
-}
-
-void KeyRight_Interrupt()
-{
-
-}
-
-void KeyPress_Interrupt()
-{
-
-}
-
-
-
 
 IoT_Error_t AWS_Shadow_Setup(){
 	IOT_INFO("Shadow Init");
@@ -431,8 +422,10 @@ IoT_Error_t AWS_Setup(){
 	 *  #AWS_IOT_MQTT_MAX_RECONNECT_WAIT_INTERVAL
 	 */
 	rc = aws_iot_shadow_set_autoreconnect_status(&mqttClient, true);
+	CloudConnection = true;
 	if(SUCCESS != rc) {
 		IOT_ERROR("Unable to set Auto Reconnect to true - %d", rc);
+		CloudConnection = false;
 		return rc;
 	}
 }
@@ -458,18 +451,6 @@ void SetupISR(){
 	{
                 printf("Unable to setup ISR KEY Down\n");
 	}
-	if(wiringPiISR(KEY_LEFT_PIN, INT_EDGE_FALLING, &KeyLeft_Interrupt) < 0)
-	{
-                printf("Unable to setup ISR KEY Left\n");
-	}
-	if(wiringPiISR(KEY_RIGHT_PIN, INT_EDGE_FALLING, &KeyRight_Interrupt) < 0)
-	{
-                printf("Unable to setup ISR KEY Right\n");
-	}
-	if(wiringPiISR(KEY_PRESS_PIN, INT_EDGE_FALLING, &KeyPress_Interrupt) < 0)
-	{
-                printf("Unable to setup ISR KEY Press\n");
-	}
 }
 
 void ShadowUpdateStatusCallback(const char *pThingName, ShadowActions_t action, Shadow_Ack_Status_t status,
@@ -493,7 +474,17 @@ void ActiveState_Callback(const char *pJsonString, uint32_t JsonStringDataLen, j
 	IOT_UNUSED(JsonStringDataLen);
 
 	if(pContext != NULL) {
-		IOT_INFO("Delta - System state changed to %d", *(bool *) (pContext->pData));
+		//IOT_INFO("Delta - System state changed to %d", *(bool *) (pContext->pData));
+		if (*(bool *) (pContext->pData) == 0)
+		{
+			//IOT_INFO("Automode off");
+			AutoMode = 0;
+		}
+		else if (*(bool *) (pContext->pData) == 1)
+		{
+			//IOT_INFO("Automode On");
+			AutoMode = 1;
+		}
 	}
 }
 
@@ -503,15 +494,26 @@ void SelfTest_Callback(const char *pJsonString, uint32_t JsonStringDataLen, json
 
 	if(pContext != NULL) {
 		IOT_INFO("Delta - Self test state changed to %d", *(bool *) (pContext->pData));
+		if (*(bool *) (pContext->pData) == 0)
+		{
+			IOT_INFO("SelfTest off");
+			SelfTest = 0;
+		}
+		else if (*(bool *) (pContext->pData) == 1)
+		{
+			IOT_INFO("SelfTest On");
+			SelfTest = 1;
+		}
 	}
 }
 
 void SetTemperature_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext) {
 	IOT_UNUSED(pJsonString);
 	IOT_UNUSED(JsonStringDataLen);
-
+	IOT_INFO("Callback");
 	if(pContext != NULL) {
 		IOT_INFO("Delta - Temperature changed to %f", *(float *) (pContext->pData));
+		SetTemperature = *(float *) (pContext->pData);
 	}
 }
 
@@ -528,13 +530,13 @@ void SetJSONHandlers(){
 	ActiveStateHandler.pKey = "SystemState";
 	ActiveStateHandler.type = SHADOW_JSON_BOOL;
 
-	temperatureHandler.cb = SetTemperature_Callback;
+	temperatureHandler.cb = NULL;
 	temperatureHandler.pKey = "Temperature";
 	temperatureHandler.pData = &temperature;
 	temperatureHandler.dataLength = sizeof(float);
 	temperatureHandler.type = SHADOW_JSON_FLOAT;
 	
-	SetTemperatureHandler.cb = NULL;
+	SetTemperatureHandler.cb = SetTemperature_Callback;
 	SetTemperatureHandler.pKey = "SetTemperature";
 	SetTemperatureHandler.pData = &SetTemperature;
 	SetTemperatureHandler.dataLength = sizeof(float);
