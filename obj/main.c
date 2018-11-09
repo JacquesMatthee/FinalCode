@@ -45,7 +45,7 @@ static uint32_t port = AWS_IOT_MQTT_PORT;
 static uint8_t numPubs = 5;
 
 bool ActiveState = true ;
-bool SelfTestInvoked = true ;
+bool SelfTestInvoked = false ;
 float temperature = 30.0;
 float SetTemperature = 50.0;
 float current = 0.0;
@@ -106,6 +106,7 @@ void Setup_OLED();
 IoT_Error_t AWS_Setup();
 IoT_Error_t AWS_Shadow_Setup();
 IoT_Error_t AWS_Shadow_Reported_Send();
+IoT_Error_t AWS_Shadow_Desired_Send();
 
 void SetupISR();
 void Key1_Interrupt();
@@ -126,7 +127,7 @@ PI_THREAD(Shadow_Update){
 	for (;;)
 	{
 		AWS_Shadow_Reported_Send();
-		delay(5000);
+		delay(1000);
 	}
 }
 
@@ -185,11 +186,13 @@ void GetTime(){
 	OLED_Display();
 	time(&now);
 	timenow = localtime(&now);
+	
 	GUI_DisChar(0+18, 22, value[timenow->tm_hour / 10], &Font24, FONT_BACKGROUND, WHITE);
 	GUI_DisChar(16+18, 22, value[timenow->tm_hour % 10], &Font24, FONT_BACKGROUND, WHITE);
 	GUI_DisChar(32+18, 22, ':', &Font24, FONT_BACKGROUND, WHITE);
 	GUI_DisChar(48+18, 22, value[timenow->tm_min / 10],  &Font24, FONT_BACKGROUND, WHITE);
 	GUI_DisChar(64+18, 22, value[timenow->tm_min % 10],  &Font24, FONT_BACKGROUND, WHITE);
+	
 	
 	//DrawConCloud();
 	//DrawComs();
@@ -211,9 +214,11 @@ void GetTime(){
 		DrawConCloud();
 	}
 	
+	TimeDate = timenow;
+	
 	//DrawAutoModeOn();
 	//DrawError();
-	DisTemp(SetTemperature);
+	DisTemp(Temp);
 	DisCurrent(Current);
 	
 	OLED_Display();
@@ -283,6 +288,34 @@ IoT_Error_t AWS_Shadow_Reported_Send(){
 	return rc; */
 }
 
+IoT_Error_t AWS_Shadow_Desired_Send(){
+	if (NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc) 
+	{
+		rc = aws_iot_shadow_yield(&mqttClient, 200);
+		if(NETWORK_ATTEMPTING_RECONNECT == rc) {
+			sleep(1);
+		}
+
+		rc = aws_iot_shadow_init_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
+		if(SUCCESS == rc) {
+			rc = aws_iot_shadow_add_desired(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 2, &ActiveStateHandler, &SelfTestHandler);
+			if(SUCCESS == rc) {
+				rc = aws_iot_finalize_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
+				if(SUCCESS == rc) {
+					//IOT_INFO("Update Shadow: %s", JsonDocumentBuffer);
+					rc = aws_iot_shadow_update(&mqttClient, AWS_IOT_MY_THING_NAME, JsonDocumentBuffer,
+											   ShadowUpdateStatusCallback, NULL, 4, true);
+				}
+			}
+		}
+		//IOT_INFO("*****************************************************************************************\n");
+		sleep(1);
+	}
+	if(SUCCESS != rc) {
+		IOT_ERROR("An error occurred in the loop %d", rc);
+	}
+}
+
 void Key1_Interrupt()
 {
 	Menu = 1;
@@ -307,16 +340,23 @@ void Key2_Interrupt()
 			if (AutoMode == 1)
 			{
 				AutoMode = 0;
+				ActiveState = false;
+				SelfTestInvoked = false;
 			}
 			else if (AutoMode == 0)
 			{
 				AutoMode = 1;
+				ActiveState = true;
+				SelfTestInvoked = false;
 			}
+			AWS_Shadow_Desired_Send();
 			Key1_Interrupt();
 		}
 		if (MenuItem == 1)
 		{
 			SelfTest = 1;
+			SelfTestInvoked = true;
+			ActiveState = false;
 			DisSelfTest();
 			delay(3000);
 			SelfTest = 0;
