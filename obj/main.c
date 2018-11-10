@@ -77,6 +77,7 @@ volatile int SelfTest = 0;
 
 volatile bool Power = false;
 volatile bool CloudConnection = false;
+volatile bool Transmit = false;
 
 
 /* Variables end */ 
@@ -122,9 +123,6 @@ void GetTime();
 
 /*******************************************************************************/
 /* Code Begin Main While Loop*/
-
-
-
 
 // initialize the mqtt client
 AWS_IoT_Client mqttClient;
@@ -192,7 +190,11 @@ int main(int argc, char **argv) {
 	}
 	
 	System_Exit();
-
+	IOT_INFO("Disconnecting");
+	rc = aws_iot_shadow_disconnect(&mqttClient);
+	if(SUCCESS != rc) {
+		IOT_ERROR("Disconnect error %d", rc);
+	}
 	return 0;
 	
 }
@@ -214,10 +216,6 @@ void GetTime(){
 	GUI_DisChar(48+18, 22, value[timenow->tm_min / 10],  &Font24, FONT_BACKGROUND, WHITE);
 	GUI_DisChar(64+18, 22, value[timenow->tm_min % 10],  &Font24, FONT_BACKGROUND, WHITE);
 	
-	
-	//DrawConCloud();
-	//DrawComs();
-	
 	if (AutoMode == 1)
 	{
 		DrawAutoModeOn();
@@ -234,16 +232,16 @@ void GetTime(){
 	{
 		DrawConCloud();
 	}
+	if (Transmit)
+	{
+		DrawComs();
+	}
 	
-	TimeDate = timenow;
-	
-	//DrawAutoModeOn();
-	//DrawError();
-	DisTemp(Temp);
+	DisTemp(temperature);
 	DisCurrent(Current);
 	
 	OLED_Display();
-	Driver_Delay_ms(oled_delay+4000);
+	Driver_Delay_ms(oled_delay-500);
 }
 
 void Setup_OLED(){
@@ -267,6 +265,7 @@ void Setup_OLED(){
 IoT_Error_t AWS_Shadow_Reported_Send(){
 	if (NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc) 
 	{
+		Transmit = true;
 		rc = aws_iot_shadow_yield(&mqttClient, 200);
 		if(NETWORK_ATTEMPTING_RECONNECT == rc) {
 			sleep(1);
@@ -295,23 +294,19 @@ IoT_Error_t AWS_Shadow_Reported_Send(){
 		//IOT_INFO("*****************************************************************************************\n");
 		sleep(1);
 	}
+	Transmit = false;
 	if(SUCCESS != rc) {
 		IOT_ERROR("An error occurred in the loop %d", rc);
+		Transmit = false;
 	}
 
-/* 	IOT_INFO("Disconnecting");
-	rc = aws_iot_shadow_disconnect(&mqttClient);
 
-	if(SUCCESS != rc) {
-		IOT_ERROR("Disconnect error %d", rc);
-	}
-
-	return rc; */
 }
 
 IoT_Error_t AWS_Shadow_Desired_Send(){
 	if (NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc) 
 	{
+		Transmit = true ;
 		rc = aws_iot_shadow_yield(&mqttClient, 200);
 		if(NETWORK_ATTEMPTING_RECONNECT == rc) {
 			sleep(1);
@@ -332,8 +327,10 @@ IoT_Error_t AWS_Shadow_Desired_Send(){
 		//IOT_INFO("*****************************************************************************************\n");
 		sleep(1);
 	}
+	Transmit = false;
 	if(SUCCESS != rc) {
 		IOT_ERROR("An error occurred in the loop %d", rc);
+		Transmit = false ;
 	}
 }
 
@@ -438,6 +435,7 @@ IoT_Error_t AWS_Shadow_Setup(){
 
 	IOT_INFO("Shadow Connect");
 	rc = aws_iot_shadow_connect(&mqttClient, &scp);
+	rc = aws_iot_shadow_delete(&mqttClient, AWS_IOT_MY_THING_NAME, NULL, NULL, 4, true);
 	if(SUCCESS != rc) {
 		IOT_ERROR("Shadow Connection Error");
 		return rc;
