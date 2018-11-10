@@ -123,19 +123,31 @@ void GetTime();
 /*******************************************************************************/
 /* Code Begin Main While Loop*/
 
-PI_THREAD(Shadow_Update){
-	for (;;)
-	{
-		AWS_Shadow_Reported_Send();
-		delay(1000);
-	}
-}
+
 
 
 // initialize the mqtt client
 AWS_IoT_Client mqttClient;
 ShadowInitParameters_t sp ;
 ShadowConnectParameters_t scp ;
+FILE *fp;
+
+PI_THREAD(Shadow_Update){
+	
+	for (;;)
+	{
+		AWS_Shadow_Reported_Send();
+		fp = fopen("Data.txt", "a+");
+		if(fp == NULL)
+		{
+			printf("Error opening file\n");
+		}
+		fwrite(JsonDocumentBuffer,sizeof(char),sizeof(JsonDocumentBuffer),fp);
+		fwrite("\n",sizeof(char),1,fp);
+		fclose (fp);
+		delay(1000);
+	}
+}
 
 static void simulateRoomTemperature(float *pRoomTemperature) {
 	static float deltaChange;
@@ -158,6 +170,14 @@ int main(int argc, char **argv) {
 	AWS_Shadow_Setup();
 	Setup_OLED();
 	
+    fp = fopen("Data.txt", "w+");
+	if(fp == NULL)
+	{
+		printf("Error opening file\n");
+		exit(1);
+	}
+	fclose (fp);
+
 	temperature = STARTING_ROOMTEMPERATURE;
 
 	piThreadCreate(Shadow_Update);
@@ -172,6 +192,7 @@ int main(int argc, char **argv) {
 	}
 	
 	System_Exit();
+
 	return 0;
 	
 }
@@ -316,8 +337,7 @@ IoT_Error_t AWS_Shadow_Desired_Send(){
 	}
 }
 
-void Key1_Interrupt()
-{
+void Key1_Interrupt(){
 	Menu = 1;
 	if (AutoMode == 1)
 	{
@@ -331,8 +351,7 @@ void Key1_Interrupt()
 	}
 }
 
-void Key2_Interrupt()
-{
+void Key2_Interrupt(){
 	if (Menu == 1)
 	{
 		if (MenuItem == 0 )
@@ -366,8 +385,7 @@ void Key2_Interrupt()
 
 }
 	 
-void Key3_Interrupt()
-{
+void Key3_Interrupt(){
 	if (Menu == 1)
 	{
 		Menu = 0;
@@ -376,8 +394,7 @@ void Key3_Interrupt()
 	}
 }
 
-void KeyUp_Interrupt()
-{
+void KeyUp_Interrupt(){
 	//Menu = 1;
 	if (AutoMode == 1 && Menu == 1)
 	{
@@ -392,8 +409,7 @@ void KeyUp_Interrupt()
 
 }
 
-void KeyDown_Interrupt()
-{
+void KeyDown_Interrupt(){
 	//Menu = 1;
 	if (AutoMode == 1 && Menu == 1)
 	{
