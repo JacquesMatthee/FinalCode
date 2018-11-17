@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <limits.h>
+#include <errno.h>
+#include <wiringSerial.h>
 #include <time.h>
 
 #include "OLED_Driver.h"
@@ -118,6 +120,17 @@ void KeyDown_Interrupt();
 
 void GetTime();
 
+
+//New Variables
+int UART_INPUT_MAX_SIZE = 1024;
+char uartInput[1024];
+int CharCurrent = 0;
+int CharTemp = 0;
+char StrTemp[20];
+char StrCurrent[20];
+char strBuffer[20];
+
+
 /* Function Definitions End */
 /*******************************************************************************/
 
@@ -134,7 +147,7 @@ PI_THREAD(Shadow_Update){
 	
 	for (;;)
 	{
-		AWS_Shadow_Reported_Send();
+		//AWS_Shadow_Reported_Send();
 		fp = fopen("Data.txt", "a+");
 		if(fp == NULL)
 		{
@@ -148,10 +161,81 @@ PI_THREAD(Shadow_Update){
 }
 
 PI_THREAD(SerialRead){
+	int fd ;
+	if ((fd = serialOpen ("/dev/ttyUSB1", 9600)) < 0)
+	{
+		fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
+		//return 1 ;
+	}
 	for(;;)
 	{
-		printf("Serial Read");
-		delay(1000);
+	//printf("For LOOP")
+	int uartInputIndex = 0;
+	int Index = 0;
+    memset(uartInput, 0, UART_INPUT_MAX_SIZE+1);
+    // now receive data, till they are available
+    // Or whole string is received
+    while (serialDataAvail(fd) > -1 && uartInputIndex < UART_INPUT_MAX_SIZE) {
+		uartInput[uartInputIndex] = serialGetchar(fd);
+		if (uartInput[uartInputIndex] == 'I' || uartInput[uartInputIndex] == 'T' || uartInput[uartInputIndex] == 'E')
+		{
+			
+			if (uartInput[uartInputIndex] == 'I')
+			{
+				//printf("Set Current\n");
+				CharCurrent = 1;
+				CharTemp = 0;
+				Index = 0;
+			}
+			if (uartInput[uartInputIndex] == 'T')
+			{
+				//printf("Set Temp\n");
+				CharCurrent = 0;
+				CharTemp = 1;
+				Index = 0;
+			}
+			if (uartInput[uartInputIndex] == 'E')
+			{
+				Index = 0;
+				CharCurrent = 0;
+				CharTemp = 0;
+				//TEMP[Index] = uartInput[uartInputIndex];
+				//printf("%s\n",TEMP);
+				//printf("END\n");
+				float T,I;
+				T = (float)atof(StrTemp);
+				temperature = T;
+				I = (float)atof(StrCurrent);
+				current = I;
+				//sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
+				//printf(strBuffer);
+			}
+		}else
+		{
+			if (CharCurrent == 1)
+			{
+				//printf("Currnet\n");
+				StrCurrent[Index] = uartInput[uartInputIndex];
+				//printf("%s\n",CURRENT);
+				Index++;
+			}
+			if (CharTemp == 1)
+			{
+				//printf("Temp\n");
+				StrTemp[Index] = uartInput[uartInputIndex];
+				//printf("%s\n",TEMP);
+				Index++;
+			}
+		}
+        if (0 == uartInput[uartInputIndex]) break; //zero terminator received
+			++uartInputIndex;
+    }
+    if (0 == uartInputIndex) break; //No more strings received
+
+    //printf("S %s\n", uartInput); // some string received
+        // Either terminated by zero in byte stream
+        // or by serialDataAvail reporting no more data
+	delay(1000);
 	}
 }
 
@@ -189,6 +273,7 @@ int main(int argc, char **argv) {
 	// loop and publish a change in temperature
 	while(1) 
 	{
+		AWS_Shadow_Reported_Send();
 		if (Menu == 0)
 		{
 			GetTime();
@@ -283,12 +368,12 @@ IoT_Error_t AWS_Shadow_Reported_Send(){
 		//rc = aws_iot_shadow_delete(&mqttClient, AWS_IOT_MY_THING_NAME, NULL, NULL, 4, true);
 		
 /* 		IOT_INFO("On Device: window state %s", windowOpen ? "true" : "false"); */
-		simulateRoomTemperature(&temperature);
-		current = temperature/2;
+		//simulateRoomTemperature(&temperature);
+		//current = temperature/2;
 		rc = aws_iot_shadow_init_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 		if(SUCCESS == rc) {
-			rc = aws_iot_shadow_add_reported(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 5, &temperatureHandler,
-											  &CurrentHandler, &ActiveStateHandler, &SelfTestHandler,  &SetTemperatureHandler); // &TimeHandler,
+			rc = aws_iot_shadow_add_reported(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 6, &temperatureHandler,
+											  &CurrentHandler, &ActiveStateHandler, &SelfTestHandler,  &SetTemperatureHandler, &TimeHandler); // &TimeHandler,
 			if(SUCCESS == rc) {
 				rc = aws_iot_finalize_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 				if(SUCCESS == rc) {
@@ -522,11 +607,11 @@ void ShadowUpdateStatusCallback(const char *pThingName, ShadowActions_t action, 
 	IOT_UNUSED(pContextData);
 
 	if(SHADOW_ACK_TIMEOUT == status) {
-		IOT_INFO("Update Timeout--");
+		//IOT_INFO("Update Timeout--");
 	} else if(SHADOW_ACK_REJECTED == status) {
-		IOT_INFO("Update RejectedXX");
+		//IOT_INFO("Update RejectedXX");
 	} else if(SHADOW_ACK_ACCEPTED == status) {
-		IOT_INFO("Update Accepted !!");
+		//IOT_INFO("Update Accepted !!");
 	}
 }
 
@@ -598,7 +683,7 @@ void SetJSONHandlers(){
 	temperatureHandler.type = SHADOW_JSON_FLOAT;
 	
 	SetTemperatureHandler.cb = SetTemperature_Callback;
-	SetTemperatureHandler.pKey = "SetTemperature";
+	SetTemperatureHandler.pKey = "TemperatureSetAt";
 	SetTemperatureHandler.pData = &SetTemperature;
 	SetTemperatureHandler.dataLength = sizeof(float);
 	SetTemperatureHandler.type = SHADOW_JSON_FLOAT;
