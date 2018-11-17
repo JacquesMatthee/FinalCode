@@ -44,11 +44,11 @@ static char HostAddress[HOST_ADDRESS_SIZE] = AWS_IOT_MQTT_HOST;
 static uint32_t port = AWS_IOT_MQTT_PORT;
 static uint8_t numPubs = 5;
 
-bool ActiveState = true ;
+bool ActiveState = false ;
 bool SelfTestInvoked = false ;
 float temperature = 30.0;
 float SetTemperature = 50.0;
-float current = 0.0;
+int current = 0.0;
 int32_t TimeDate = 0 ;
 
 IoT_Error_t rc = FAILURE;
@@ -143,6 +143,14 @@ PI_THREAD(Shadow_Update){
 		fwrite(JsonDocumentBuffer,sizeof(char),sizeof(JsonDocumentBuffer),fp);
 		fwrite("\n",sizeof(char),1,fp);
 		fclose (fp);
+		delay(100);
+	}
+}
+
+PI_THREAD(SerialRead){
+	for(;;)
+	{
+		printf("Serial Read");
 		delay(1000);
 	}
 }
@@ -152,12 +160,9 @@ static void simulateRoomTemperature(float *pRoomTemperature) {
 
 	if(*pRoomTemperature >= ROOMTEMPERATURE_UPPERLIMIT) {
 		deltaChange = -0.5f;
-		//windowOpen = true;
 	} else if(*pRoomTemperature <= ROOMTEMPERATURE_LOWERLIMIT) {
 		deltaChange = 0.5f;
-		
 	}
-
 	*pRoomTemperature += deltaChange;
 }
 
@@ -179,6 +184,7 @@ int main(int argc, char **argv) {
 	temperature = STARTING_ROOMTEMPERATURE;
 
 	piThreadCreate(Shadow_Update);
+	piThreadCreate(SerialRead);
 	
 	// loop and publish a change in temperature
 	while(1) 
@@ -238,10 +244,10 @@ void GetTime(){
 	}
 	
 	DisTemp(temperature);
-	DisCurrent(Current);
+	DisCurrent(current);
 	
 	OLED_Display();
-	Driver_Delay_ms(oled_delay-500);
+	Driver_Delay_ms(oled_delay+1000);
 }
 
 void Setup_OLED(){
@@ -278,10 +284,11 @@ IoT_Error_t AWS_Shadow_Reported_Send(){
 		
 /* 		IOT_INFO("On Device: window state %s", windowOpen ? "true" : "false"); */
 		simulateRoomTemperature(&temperature);
+		current = temperature/2;
 		rc = aws_iot_shadow_init_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 		if(SUCCESS == rc) {
-			rc = aws_iot_shadow_add_reported(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 6, &temperatureHandler,
-											  &CurrentHandler, &ActiveStateHandler, &SelfTestHandler, &TimeHandler, &SetTemperatureHandler);
+			rc = aws_iot_shadow_add_reported(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 5, &temperatureHandler,
+											  &CurrentHandler, &ActiveStateHandler, &SelfTestHandler,  &SetTemperatureHandler); // &TimeHandler,
 			if(SUCCESS == rc) {
 				rc = aws_iot_finalize_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 				if(SUCCESS == rc) {
@@ -435,7 +442,7 @@ IoT_Error_t AWS_Shadow_Setup(){
 
 	IOT_INFO("Shadow Connect");
 	rc = aws_iot_shadow_connect(&mqttClient, &scp);
-	rc = aws_iot_shadow_delete(&mqttClient, AWS_IOT_MY_THING_NAME, NULL, NULL, 4, true);
+	//rc = aws_iot_shadow_delete(&mqttClient, AWS_IOT_MY_THING_NAME, NULL, NULL, 4, true);
 	if(SUCCESS != rc) {
 		IOT_ERROR("Shadow Connection Error");
 		return rc;
@@ -599,8 +606,8 @@ void SetJSONHandlers(){
 	CurrentHandler.cb = NULL;
 	CurrentHandler.pKey = "Current";
 	CurrentHandler.pData = &current;
-	CurrentHandler.dataLength = sizeof(float);
-	CurrentHandler.type = SHADOW_JSON_FLOAT;
+	CurrentHandler.dataLength = sizeof(int);
+	CurrentHandler.type = SHADOW_JSON_INT32;
 	
 	TimeHandler.cb = NULL;
 	TimeHandler.pKey = "SendDataAt";

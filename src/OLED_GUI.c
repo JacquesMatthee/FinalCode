@@ -6,6 +6,7 @@ extern OLED_DIS sOLED_DIS;
 void DisSelfTest(void)
 {
 	OLED_Clear(OLED_BACKGROUND);
+	OLED_SetCursor(0,0);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
 	GUI_DrawLine(0, 5, sOLED_DIS.OLED_Dis_Column , 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
 	GUI_DrawLine(0, sOLED_DIS.OLED_Dis_Page - 5, sOLED_DIS.OLED_Dis_Column , sOLED_DIS.OLED_Dis_Page - 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
@@ -18,6 +19,7 @@ void DisSelfTest(void)
 void MenuPage1_Auto_On(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
+	OLED_SetCursor(0,0);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
 	GUI_DrawLine(0, 5, sOLED_DIS.OLED_Dis_Column , 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
 	GUI_DrawLine(0, sOLED_DIS.OLED_Dis_Page - 5, sOLED_DIS.OLED_Dis_Column , sOLED_DIS.OLED_Dis_Page - 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
@@ -37,6 +39,7 @@ void MenuPage1_Auto_On(int SetTemp)
 void MenuPage2_Auto_On(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
+	OLED_SetCursor(0,0);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
 	GUI_DrawLine(0, 5, sOLED_DIS.OLED_Dis_Column , 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
 	GUI_DrawLine(0, sOLED_DIS.OLED_Dis_Page - 5, sOLED_DIS.OLED_Dis_Column , sOLED_DIS.OLED_Dis_Page - 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
@@ -56,6 +59,7 @@ void MenuPage2_Auto_On(int SetTemp)
 void MenuPage1_Auto_Off(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
+	OLED_SetCursor(0,0);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
 	GUI_DrawLine(0, 5, sOLED_DIS.OLED_Dis_Column , 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
 	GUI_DrawLine(0, sOLED_DIS.OLED_Dis_Page - 5, sOLED_DIS.OLED_Dis_Column , sOLED_DIS.OLED_Dis_Page - 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
@@ -75,6 +79,7 @@ void MenuPage1_Auto_Off(int SetTemp)
 void MenuPage2_Auto_Off(int SetTemp)
 {
 	OLED_Clear(OLED_BACKGROUND);
+	OLED_SetCursor(0,0);
 	GUI_DrawLine(0, 1, sOLED_DIS.OLED_Dis_Column , 1, WHITE, LINE_SOLID, DOT_PIXEL_2X2);
 	GUI_DrawLine(0, 5, sOLED_DIS.OLED_Dis_Column , 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
 	GUI_DrawLine(0, sOLED_DIS.OLED_Dis_Page - 5, sOLED_DIS.OLED_Dis_Column , sOLED_DIS.OLED_Dis_Page - 5, WHITE, LINE_DOTTED, DOT_PIXEL_DFT);
