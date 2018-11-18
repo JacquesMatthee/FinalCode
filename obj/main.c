@@ -50,7 +50,7 @@ bool ActiveState = false ;
 bool SelfTestInvoked = false ;
 float temperature = 30.0;
 float SetTemperature = 50.0;
-int current = 0.0;
+float current = 2.0;
 int32_t TimeDate = 0 ;
 
 IoT_Error_t rc = FAILURE;
@@ -126,8 +126,8 @@ int UART_INPUT_MAX_SIZE = 1024;
 char uartInput[1024];
 int CharCurrent = 0;
 int CharTemp = 0;
-char StrTemp[20];
-char StrCurrent[20];
+char StrTemp[6];
+char StrCurrent[6];
 char strBuffer[20];
 
 
@@ -142,12 +142,17 @@ AWS_IoT_Client mqttClient;
 ShadowInitParameters_t sp ;
 ShadowConnectParameters_t scp ;
 FILE *fp;
+int fd ;
 
 PI_THREAD(Shadow_Update){
 	
 	for (;;)
 	{
 		//AWS_Shadow_Reported_Send();
+		if (Menu == 0)
+		{
+			GetTime();
+		} 
 		fp = fopen("Data.txt", "a+");
 		if(fp == NULL)
 		{
@@ -161,33 +166,34 @@ PI_THREAD(Shadow_Update){
 }
 
 PI_THREAD(SerialRead){
-	int fd ;
-	if ((fd = serialOpen ("/dev/ttyUSB1", 9600)) < 0)
+	//int fd ;
+	//printf("Thread\n");
+	if ((fd = serialOpen ("/dev/ttyUSB0", 9600)) < 0)
 	{
 		fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
-		//return 1 ;
 	}
+	//serialFlush(fd) ;
+	//printf("Before\n");
 	for(;;)
 	{
-	//printf("For LOOP")
 	int uartInputIndex = 0;
 	int Index = 0;
-    memset(uartInput, 0, UART_INPUT_MAX_SIZE+1);
-    // now receive data, till they are available
-    // Or whole string is received
+	//printf("here\n");
     while (serialDataAvail(fd) > -1 && uartInputIndex < UART_INPUT_MAX_SIZE) {
 		uartInput[uartInputIndex] = serialGetchar(fd);
+		//printf(uartInput);
+		//printf("while\n");
 		if (uartInput[uartInputIndex] == 'I' || uartInput[uartInputIndex] == 'T' || uartInput[uartInputIndex] == 'E')
 		{
 			
-			if (uartInput[uartInputIndex] == 'I')
+			if (uartInput[uartInputIndex] == 'I' )
 			{
 				//printf("Set Current\n");
 				CharCurrent = 1;
 				CharTemp = 0;
 				Index = 0;
 			}
-			if (uartInput[uartInputIndex] == 'T')
+			if (uartInput[uartInputIndex] == 'T' )
 			{
 				//printf("Set Temp\n");
 				CharCurrent = 0;
@@ -209,12 +215,13 @@ PI_THREAD(SerialRead){
 				current = I;
 				//sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
 				//printf(strBuffer);
+				//serialFlush(fd) ;
 			}
 		}else
 		{
 			if (CharCurrent == 1)
 			{
-				//printf("Currnet\n");
+				//printf("Current\n");
 				StrCurrent[Index] = uartInput[uartInputIndex];
 				//printf("%s\n",CURRENT);
 				Index++;
@@ -235,8 +242,9 @@ PI_THREAD(SerialRead){
     //printf("S %s\n", uartInput); // some string received
         // Either terminated by zero in byte stream
         // or by serialDataAvail reporting no more data
-	delay(1000);
+	delay(100);
 	}
+	serialClose(fd);
 }
 
 static void simulateRoomTemperature(float *pRoomTemperature) {
@@ -251,6 +259,14 @@ static void simulateRoomTemperature(float *pRoomTemperature) {
 }
 
 int main(int argc, char **argv) {
+	memset(uartInput, 0, UART_INPUT_MAX_SIZE+1);
+	if ((fd = serialOpen ("/dev/ttyUSB0", 9600)) < 0)
+	{
+		fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
+		return 1;
+	}
+	serialFlush(fd) ;
+	serialClose(fd);
 	SetJSONHandlers();
 	AWS_Setup();
 	parseInputArgsForConnectParams(argc, argv);
@@ -274,10 +290,10 @@ int main(int argc, char **argv) {
 	while(1) 
 	{
 		AWS_Shadow_Reported_Send();
-		if (Menu == 0)
+		/* if (Menu == 0)
 		{
 			GetTime();
-		}
+		} */
 	}
 	
 	System_Exit();
@@ -658,8 +674,8 @@ void SetTemperature_Callback(const char *pJsonString, uint32_t JsonStringDataLen
 	IOT_UNUSED(JsonStringDataLen);
 	IOT_INFO("Callback");
 	if(pContext != NULL) {
-		IOT_INFO("Delta - Temperature changed to %f", *(float *) (pContext->pData));
-		SetTemperature = *(float *) (pContext->pData);
+		IOT_INFO("Delta - Temperature changed to %f", *(float*)(pContext->pData));
+		SetTemperature = *(float *)(pContext->pData);
 	}
 }
 
@@ -683,7 +699,7 @@ void SetJSONHandlers(){
 	temperatureHandler.type = SHADOW_JSON_FLOAT;
 	
 	SetTemperatureHandler.cb = SetTemperature_Callback;
-	SetTemperatureHandler.pKey = "TemperatureSetAt";
+	SetTemperatureHandler.pKey = "SetTemperature";
 	SetTemperatureHandler.pData = &SetTemperature;
 	SetTemperatureHandler.dataLength = sizeof(float);
 	SetTemperatureHandler.type = SHADOW_JSON_FLOAT;
@@ -691,8 +707,8 @@ void SetJSONHandlers(){
 	CurrentHandler.cb = NULL;
 	CurrentHandler.pKey = "Current";
 	CurrentHandler.pData = &current;
-	CurrentHandler.dataLength = sizeof(int);
-	CurrentHandler.type = SHADOW_JSON_INT32;
+	CurrentHandler.dataLength = sizeof(float);
+	CurrentHandler.type = SHADOW_JSON_FLOAT;
 	
 	TimeHandler.cb = NULL;
 	TimeHandler.pKey = "SendDataAt";
