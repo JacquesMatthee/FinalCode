@@ -254,7 +254,7 @@ int main(int argc, char **argv) {
 
 	piThreadCreate(Shadow_Update);
 	piThreadCreate(SerialRead);
-	
+	AWS_Shadow_Desired_Send();
 	while(1) 
 	{
 		AWS_Shadow_Reported_Send();
@@ -374,7 +374,7 @@ IoT_Error_t AWS_Shadow_Desired_Send(){
 
 		rc = aws_iot_shadow_init_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 		if(SUCCESS == rc) {
-			rc = aws_iot_shadow_add_desired(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 2, &ActiveStateHandler, &SelfTestHandler);
+			rc = aws_iot_shadow_add_desired(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 3, &ActiveStateHandler, &SelfTestHandler, &EmergencyStopHandler);
 			if(SUCCESS == rc) {
 				rc = aws_iot_finalize_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 				if(SUCCESS == rc) {
@@ -499,10 +499,12 @@ IoT_Error_t AWS_Shadow_Setup(){
 	rc = aws_iot_shadow_register_delta(&mqttClient, &ActiveStateHandler);
 	rc = aws_iot_shadow_register_delta(&mqttClient, &SelfTestHandler);
 	rc = aws_iot_shadow_register_delta(&mqttClient, &SetTemperatureHandler);
+	rc = aws_iot_shadow_register_delta(&mqttClient, &EmergencyStopHandler);
 	if(SUCCESS != rc) {
 		IOT_ERROR("Shadow Register Delta Error");
 	}
 	aws_iot_shadow_enable_discard_old_delta_msgs();
+	//AWS_Shadow_Desired_Send();
 }
 
 IoT_Error_t AWS_Setup(){
@@ -636,15 +638,18 @@ void EmergencyStop_Callback(const char *pJsonString, uint32_t JsonStringDataLen,
 		IOT_INFO("Delta - EmergencyStop state changed to %d", *(bool *) (pContext->pData));
 		if (*(bool *) (pContext->pData) == 0)
 		{
-			IOT_INFO("EmergencyStop off");
+			//IOT_INFO("EmergencyStop off");
 			EmergencyStop = false;
 		}
 		else if (*(bool *) (pContext->pData) == 1)
 		{
-			IOT_INFO("EmergencyStop On");
+			//IOT_INFO("EmergencyStop On");
 			EmergencyStop = true;
 			serialPutchar (fd,'E');
 			serialPuts (fd ,"\n");
+			ActiveState = false;
+			SelfTest = false;
+			AWS_Shadow_Desired_Send();
 		}
 	}
 }
@@ -686,7 +691,7 @@ void SetJSONHandlers(){
 	TimeHandler.dataLength = sizeof(int32_t);
 	TimeHandler.type = SHADOW_JSON_INT32;
 	
-	EmergencyStopHandler.cb = NULL;
+	EmergencyStopHandler.cb = EmergencyStop_Callback;
 	EmergencyStopHandler.pData = &EmergencyStop;
 	EmergencyStopHandler.dataLength = sizeof(bool);
 	EmergencyStopHandler.pKey = "EmergencyStop";
