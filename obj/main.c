@@ -30,9 +30,9 @@
 
 /*******************************************************************************/
 /* Defines */
-#define ROOMTEMPERATURE_UPPERLIMIT 32.0f
-#define ROOMTEMPERATURE_LOWERLIMIT 25.0f
-#define STARTING_ROOMTEMPERATURE ROOMTEMPERATURE_LOWERLIMIT
+//#define ROOMTEMPERATURE_UPPERLIMIT 32.0f
+//#define ROOMTEMPERATURE_LOWERLIMIT 25.0f
+//#define STARTING_ROOMTEMPERATURE ROOMTEMPERATURE_LOWERLIMIT
 
 #define MAX_LENGTH_OF_UPDATE_JSON_BUFFER 200
 #define HOST_ADDRESS_SIZE 255
@@ -41,45 +41,55 @@
 
 /*******************************************************************************/
 /* Variables */
+// AWS
 static char certDirectory[PATH_MAX + 1] = "../certs";
 static char HostAddress[HOST_ADDRESS_SIZE] = AWS_IOT_MQTT_HOST;
 static uint32_t port = AWS_IOT_MQTT_PORT;
 static uint8_t numPubs = 5;
 
+// System Variables
 bool ActiveState = false ;
 bool SelfTestInvoked = false ;
+bool EmergencyStop = false;
 float temperature = 30.0;
 float SetTemperature = 50.0;
 float current = 2.0;
 int32_t TimeDate = 0 ;
 
-IoT_Error_t rc = FAILURE;
-//int32_t i = 0;
-	
+// JSON Variables
 char JsonDocumentBuffer[MAX_LENGTH_OF_UPDATE_JSON_BUFFER];
 size_t sizeOfJsonDocumentBuffer = sizeof(JsonDocumentBuffer) / sizeof(JsonDocumentBuffer[0]);
 char *pJsonStringToUpdate;
 	
+// AWS 
 char rootCA[PATH_MAX + 1];
 char clientCRT[PATH_MAX + 1];
 char clientKey[PATH_MAX + 1];
 char CurrentWD[PATH_MAX + 1];
+IoT_Error_t rc = FAILURE;
 
+// OLED Variables
 time_t now;
 struct tm *timenow;
 int oled_delay = 1000;
 char value[10] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
 int flag = 0;
 volatile int Menu = 0;
-volatile int Temp = 100;
-volatile int Current = 50;
 volatile int AutoMode = 0 ;
 volatile int MenuItem = 0;
 volatile int SelfTest = 0;
-
 volatile bool Power = false;
 volatile bool CloudConnection = false;
 volatile bool Transmit = false;
+
+// Receive Serial
+int UART_INPUT_MAX_SIZE = 1024;
+char uartInput[1024];
+bool CharCurrent = false;
+bool CharTemp = false;
+char StrTemp[6];
+char StrCurrent[6];
+char strBuffer[20];
 
 
 /* Variables end */ 
@@ -92,6 +102,7 @@ jsonStruct_t ActiveStateHandler;
 jsonStruct_t temperatureHandler;
 jsonStruct_t SetTemperatureHandler;
 jsonStruct_t CurrentHandler;
+jsonStruct_t EmergencyStopHandler;
 jsonStruct_t TimeHandler;
 /* JSON Handlers end */
 /*******************************************************************************/
@@ -103,6 +114,7 @@ void ShadowUpdateStatusCallback(const char *pThingName, ShadowActions_t action, 
 void ActiveState_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext);
 void SelfTest_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext);
 void SetTemperature_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext);
+void EmergencyStop_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext);
 void SetJSONHandlers();
 void parseInputArgsForConnectParams(int argc, char **argv);
 void Setup_OLED();
@@ -119,17 +131,6 @@ void KeyUp_Interrupt();
 void KeyDown_Interrupt();
 
 void GetTime();
-
-
-//New Variables
-int UART_INPUT_MAX_SIZE = 1024;
-char uartInput[1024];
-int CharCurrent = 0;
-int CharTemp = 0;
-char StrTemp[6];
-char StrCurrent[6];
-char strBuffer[20];
-
 
 /* Function Definitions End */
 /*******************************************************************************/
@@ -148,7 +149,6 @@ PI_THREAD(Shadow_Update){
 	
 	for (;;)
 	{
-		//AWS_Shadow_Reported_Send();
 		if (Menu == 0)
 		{
 			GetTime();
@@ -166,71 +166,57 @@ PI_THREAD(Shadow_Update){
 }
 
 PI_THREAD(SerialRead){
-	//int fd ;
-	//printf("Thread\n");
 	if ((fd = serialOpen ("/dev/ttyUSB0", 9600)) < 0)
 	{
 		fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
 	}
-	//serialFlush(fd) ;
-	//printf("Before\n");
 	for(;;)
 	{
-	int uartInputIndex = 0;
-	int Index = 0;
-	//printf("here\n");
-    while (serialDataAvail(fd) > -1 && uartInputIndex < UART_INPUT_MAX_SIZE) {
-		uartInput[uartInputIndex] = serialGetchar(fd);
-		//printf(uartInput);
-		//printf("while\n");
-		if (uartInput[uartInputIndex] == 'I' || uartInput[uartInputIndex] == 'T' || uartInput[uartInputIndex] == 'E')
-		{
-			
-			if (uartInput[uartInputIndex] == 'I' )
+		int uartInputIndex = 0;
+		int Index = 0;
+		while (serialDataAvail(fd) > -1 && uartInputIndex < UART_INPUT_MAX_SIZE) {
+			uartInput[uartInputIndex] = serialGetchar(fd);
+			if (uartInput[uartInputIndex] == 'I' || uartInput[uartInputIndex] == 'T' || uartInput[uartInputIndex] == 'E')
 			{
-				//printf("Set Current\n");
-				CharCurrent = 1;
-				CharTemp = 0;
-				Index = 0;
-			}
-			if (uartInput[uartInputIndex] == 'T' )
-			{
-				//printf("Set Temp\n");
-				CharCurrent = 0;
-				CharTemp = 1;
-				Index = 0;
-			}
-			if (uartInput[uartInputIndex] == 'E')
-			{
-				Index = 0;
-				CharCurrent = 0;
-				CharTemp = 0;
-				//TEMP[Index] = uartInput[uartInputIndex];
-				//printf("%s\n",TEMP);
-				//printf("END\n");
-				float T,I;
-				T = (float)atof(StrTemp);
-				temperature = T;
-				I = (float)atof(StrCurrent);
-				current = I;
-				//sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
-				//printf(strBuffer);
-				//serialFlush(fd) ;
-			}
+				if (uartInput[uartInputIndex] == 'I' )
+				{
+					CharCurrent = true;
+					CharTemp = false;
+					Index = 0;
+				}
+				if (uartInput[uartInputIndex] == 'T' )
+				{
+					CharCurrent = false;
+					CharTemp = true;
+					Index = 0;
+				}
+				if (uartInput[uartInputIndex] == 'E')
+				{
+					Index = 0;
+					CharCurrent = false;
+					CharTemp = false;
+					//TEMP[Index] = uartInput[uartInputIndex];
+					//printf("%s\n",TEMP);
+					//printf("END\n");
+					float T,I;
+					T = (float)atof(StrTemp);
+					temperature = T;
+					I = (float)atof(StrCurrent);
+					current = I;
+					//sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
+					//printf(strBuffer);
+					//serialFlush(fd) ;
+				}
 		}else
 		{
-			if (CharCurrent == 1)
+			if (CharCurrent)
 			{
-				//printf("Current\n");
 				StrCurrent[Index] = uartInput[uartInputIndex];
-				//printf("%s\n",CURRENT);
 				Index++;
 			}
-			if (CharTemp == 1)
+			if (CharTemp)
 			{
-				//printf("Temp\n");
 				StrTemp[Index] = uartInput[uartInputIndex];
-				//printf("%s\n",TEMP);
 				Index++;
 			}
 		}
@@ -238,24 +224,9 @@ PI_THREAD(SerialRead){
 			++uartInputIndex;
     }
     if (0 == uartInputIndex) break; //No more strings received
-
-    //printf("S %s\n", uartInput); // some string received
-        // Either terminated by zero in byte stream
-        // or by serialDataAvail reporting no more data
 	delay(100);
 	}
 	serialClose(fd);
-}
-
-static void simulateRoomTemperature(float *pRoomTemperature) {
-	static float deltaChange;
-
-	if(*pRoomTemperature >= ROOMTEMPERATURE_UPPERLIMIT) {
-		deltaChange = -0.5f;
-	} else if(*pRoomTemperature <= ROOMTEMPERATURE_LOWERLIMIT) {
-		deltaChange = 0.5f;
-	}
-	*pRoomTemperature += deltaChange;
 }
 
 int main(int argc, char **argv) {
@@ -281,21 +252,14 @@ int main(int argc, char **argv) {
 	}
 	fclose (fp);
 
-	temperature = STARTING_ROOMTEMPERATURE;
-
 	piThreadCreate(Shadow_Update);
 	piThreadCreate(SerialRead);
 	
-	// loop and publish a change in temperature
 	while(1) 
 	{
 		AWS_Shadow_Reported_Send();
-		/* if (Menu == 0)
-		{
-			GetTime();
-		} */
+		delay(100);
 	}
-	
 	System_Exit();
 	IOT_INFO("Disconnecting");
 	rc = aws_iot_shadow_disconnect(&mqttClient);
@@ -310,7 +274,6 @@ int main(int argc, char **argv) {
 
 /*******************************************************************************/
 /* Functions Begin */
-
 void GetTime(){
 	OLED_Clear(OLED_BACKGROUND);
 	OLED_Display();
@@ -379,27 +342,18 @@ IoT_Error_t AWS_Shadow_Reported_Send(){
 			// If the client is attempting to reconnect we will skip the rest of the loop.
 			//continue;
 		}
-		//IOT_INFO("\n=======================================================================================\n");
-		
-		//rc = aws_iot_shadow_delete(&mqttClient, AWS_IOT_MY_THING_NAME, NULL, NULL, 4, true);
-		
-/* 		IOT_INFO("On Device: window state %s", windowOpen ? "true" : "false"); */
-		//simulateRoomTemperature(&temperature);
-		//current = temperature/2;
 		rc = aws_iot_shadow_init_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 		if(SUCCESS == rc) {
 			rc = aws_iot_shadow_add_reported(JsonDocumentBuffer, sizeOfJsonDocumentBuffer, 6, &temperatureHandler,
-											  &CurrentHandler, &ActiveStateHandler, &SelfTestHandler,  &SetTemperatureHandler, &TimeHandler); // &TimeHandler,
+											  &CurrentHandler, &ActiveStateHandler, &SelfTestHandler,  &SetTemperatureHandler ,&EmergencyStopHandler); // &TimeHandler,
 			if(SUCCESS == rc) {
 				rc = aws_iot_finalize_json_document(JsonDocumentBuffer, sizeOfJsonDocumentBuffer);
 				if(SUCCESS == rc) {
-					//IOT_INFO("Update Shadow: %s", JsonDocumentBuffer);
 					rc = aws_iot_shadow_update(&mqttClient, AWS_IOT_MY_THING_NAME, JsonDocumentBuffer,
 											   ShadowUpdateStatusCallback, NULL, 4, true);
 				}
 			}
 		}
-		//IOT_INFO("*****************************************************************************************\n");
 		sleep(1);
 	}
 	Transmit = false;
@@ -407,8 +361,6 @@ IoT_Error_t AWS_Shadow_Reported_Send(){
 		IOT_ERROR("An error occurred in the loop %d", rc);
 		Transmit = false;
 	}
-
-
 }
 
 IoT_Error_t AWS_Shadow_Desired_Send(){
@@ -500,7 +452,6 @@ void Key3_Interrupt(){
 }
 
 void KeyUp_Interrupt(){
-	//Menu = 1;
 	if (AutoMode == 1 && Menu == 1)
 	{
 		MenuPage1_Auto_On(SetTemperature);
@@ -515,7 +466,6 @@ void KeyUp_Interrupt(){
 }
 
 void KeyDown_Interrupt(){
-	//Menu = 1;
 	if (AutoMode == 1 && Menu == 1)
 	{
 		MenuPage2_Auto_On(SetTemperature);
@@ -526,7 +476,6 @@ void KeyDown_Interrupt(){
 		MenuPage2_Auto_Off(SetTemperature);
 		MenuItem = 1;
 	}
-	//MenuPage2_Auto_Off();
 }
 
 IoT_Error_t AWS_Shadow_Setup(){
@@ -543,7 +492,6 @@ IoT_Error_t AWS_Shadow_Setup(){
 
 	IOT_INFO("Shadow Connect");
 	rc = aws_iot_shadow_connect(&mqttClient, &scp);
-	//rc = aws_iot_shadow_delete(&mqttClient, AWS_IOT_MY_THING_NAME, NULL, NULL, 4, true);
 	if(SUCCESS != rc) {
 		IOT_ERROR("Shadow Connection Error");
 		return rc;
@@ -634,18 +582,18 @@ void ShadowUpdateStatusCallback(const char *pThingName, ShadowActions_t action, 
 void ActiveState_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext) {
 	IOT_UNUSED(pJsonString);
 	IOT_UNUSED(JsonStringDataLen);
-
 	if(pContext != NULL) {
-		//IOT_INFO("Delta - System state changed to %d", *(bool *) (pContext->pData));
 		if (*(bool *) (pContext->pData) == 0)
 		{
-			//IOT_INFO("Automode off");
 			AutoMode = 0;
+			serialPutchar (fd,'D');
+			serialPuts (fd ,"\n");
 		}
 		else if (*(bool *) (pContext->pData) == 1)
 		{
-			//IOT_INFO("Automode On");
 			AutoMode = 1;
+			serialPutchar (fd,'A');
+			serialPuts (fd ,"\n");
 		}
 	}
 }
@@ -653,7 +601,6 @@ void ActiveState_Callback(const char *pJsonString, uint32_t JsonStringDataLen, j
 void SelfTest_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext) {
 	IOT_UNUSED(pJsonString);
 	IOT_UNUSED(JsonStringDataLen);
-
 	if(pContext != NULL) {
 		IOT_INFO("Delta - Self test state changed to %d", *(bool *) (pContext->pData));
 		if (*(bool *) (pContext->pData) == 0)
@@ -665,6 +612,8 @@ void SelfTest_Callback(const char *pJsonString, uint32_t JsonStringDataLen, json
 		{
 			IOT_INFO("SelfTest On");
 			SelfTest = 1;
+			serialPutchar (fd,'S');
+			serialPuts (fd ,"\n");
 		}
 	}
 }
@@ -672,10 +621,31 @@ void SelfTest_Callback(const char *pJsonString, uint32_t JsonStringDataLen, json
 void SetTemperature_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext) {
 	IOT_UNUSED(pJsonString);
 	IOT_UNUSED(JsonStringDataLen);
-	IOT_INFO("Callback");
 	if(pContext != NULL) {
 		IOT_INFO("Delta - Temperature changed to %f", *(float*)(pContext->pData));
 		SetTemperature = *(float *)(pContext->pData);
+		serialPutchar (fd,'T');
+		serialPuts (fd ,"\n");
+	}
+}
+
+void EmergencyStop_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext) {
+	IOT_UNUSED(pJsonString);
+	IOT_UNUSED(JsonStringDataLen);
+	if(pContext != NULL) {
+		IOT_INFO("Delta - EmergencyStop state changed to %d", *(bool *) (pContext->pData));
+		if (*(bool *) (pContext->pData) == 0)
+		{
+			IOT_INFO("EmergencyStop off");
+			EmergencyStop = false;
+		}
+		else if (*(bool *) (pContext->pData) == 1)
+		{
+			IOT_INFO("EmergencyStop On");
+			EmergencyStop = true;
+			serialPutchar (fd,'E');
+			serialPuts (fd ,"\n");
+		}
 	}
 }
 
@@ -715,6 +685,13 @@ void SetJSONHandlers(){
 	TimeHandler.pData = &TimeDate;
 	TimeHandler.dataLength = sizeof(int32_t);
 	TimeHandler.type = SHADOW_JSON_INT32;
+	
+	EmergencyStopHandler.cb = NULL;
+	EmergencyStopHandler.pData = &EmergencyStop;
+	EmergencyStopHandler.dataLength = sizeof(bool);
+	EmergencyStopHandler.pKey = "EmergencyStop";
+	EmergencyStopHandler.type = SHADOW_JSON_BOOL;
+	
 	
 }
 
