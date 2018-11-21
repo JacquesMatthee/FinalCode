@@ -132,6 +132,12 @@ void KeyDown_Interrupt();
 
 void GetTime();
 
+int Z = 0;
+float Total_Temp = 0.0;
+float Total_Curr = 0.0;
+float Ave_Temp = 0.0;
+float Ave_Curr = 0.0;
+
 /* Function Definitions End */
 /*******************************************************************************/
 
@@ -201,11 +207,14 @@ PI_THREAD(SerialRead){
 					float T,I;
 					T = (float)atof(StrTemp);
 					temperature = T;
+					Total_Temp += temperature;
 					I = (float)atof(StrCurrent);
 					current = I;
-					//sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
+					Total_Curr += current;
+					Z++;
+					sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
 					//printf(strBuffer);
-					//serialFlush(fd) ;
+					serialFlush(fd) ;
 				}
 		}else
 		{
@@ -224,7 +233,7 @@ PI_THREAD(SerialRead){
 			++uartInputIndex;
     }
     if (0 == uartInputIndex) break; //No more strings received
-	delay(100);
+	//delay(100);
 	}
 	serialClose(fd);
 }
@@ -257,7 +266,13 @@ int main(int argc, char **argv) {
 	AWS_Shadow_Desired_Send();
 	while(1) 
 	{
+		Ave_Temp = Total_Temp/Z;
+		Ave_Curr = Total_Curr/Z;
+		printf("Temp = %f",Ave_Temp);
 		AWS_Shadow_Reported_Send();
+		Total_Temp = 0.0;
+		Total_Curr = 0.0;
+		Z = 0;
 		delay(1000);
 	}
 	System_Exit();
@@ -434,6 +449,8 @@ void Key2_Interrupt(){
 			SelfTestInvoked = true;
 			ActiveState = false;
 			DisSelfTest();
+			serialPutchar (fd,'S');
+			serialPuts (fd ,"\n");
 			delay(3000);
 			SelfTest = 0;
 			Menu = 0 ;
