@@ -96,20 +96,26 @@ void MenuPage2_Auto_Off(int SetTemp)
 	OLED_Display();
 }
 
-void DisTemp(int temp)
+void DisTemp(float temp)
 {
-	GUI_Disbitmap(2, 48, flame_icon, PX_16, PX_16);
-	GUI_DisNum(18,48,temp,&Font16,FONT_BACKGROUND, WHITE);
-	GUI_DrawPoint(50,48,WHITE,DOT_PIXEL_2X2,DOT_FILL_AROUND);
-	GUI_DisChar(52,48,TEMP_Symbol,&Font16,FONT_BACKGROUND, WHITE);
-	GUI_DisChar(60,48,'|',&Font16,FONT_BACKGROUND, WHITE);
+	char Tempp[10] = "0.0";
+	GUI_Disbitmap(0, 48, flame_icon, PX_16, PX_16);
+	//GUI_DisNum(18,52,temp,&Font12,FONT_BACKGROUND, WHITE);
+	sprintf(Tempp,"%2.1f",temp);
+	GUI_DisString_EN(18,52,Tempp,&Font12,FONT_BACKGROUND, WHITE);
+	GUI_DrawPoint(48,52,WHITE,DOT_PIXEL_2X2,DOT_FILL_AROUND);
+	GUI_DisChar(50,52,TEMP_Symbol,&Font12,FONT_BACKGROUND, WHITE);
+	GUI_DisChar(54,48,'|',&Font16,FONT_BACKGROUND, WHITE);
 }
 
-void DisCurrent(int current)
+void DisCurrent(float current)
 {
-	GUI_Disbitmap(70, 48, Current_16px, PX_16, PX_16);
-	GUI_DisNum(88,48,current,&Font16,FONT_BACKGROUND, WHITE);
-	GUI_DisChar(118,48,CURRENT_Symbol,&Font16,FONT_BACKGROUND, WHITE);
+	char Curr[10] = "0.0";
+	sprintf(Curr,"%2.2f",current);
+	GUI_Disbitmap(64, 48, Current_16px, PX_16, PX_16);
+	//GUI_DisNum(88,48,current,&Font16,FONT_BACKGROUND, WHITE);
+	GUI_DisString_EN(80,52,Curr,&Font12,FONT_BACKGROUND, WHITE);
+	GUI_DisChar(118,52,CURRENT_Symbol,&Font12,FONT_BACKGROUND, WHITE);
 }
 
 void DrawError(void)

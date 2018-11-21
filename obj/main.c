@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
 	while(1) 
 	{
 		AWS_Shadow_Reported_Send();
-		delay(100);
+		delay(1000);
 	}
 	System_Exit();
 	IOT_INFO("Disconnecting");
@@ -623,10 +623,13 @@ void SelfTest_Callback(const char *pJsonString, uint32_t JsonStringDataLen, json
 void SetTemperature_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext) {
 	IOT_UNUSED(pJsonString);
 	IOT_UNUSED(JsonStringDataLen);
+	char Temp_Temp[10] = "";
 	if(pContext != NULL) {
 		IOT_INFO("Delta - Temperature changed to %f", *(float*)(pContext->pData));
 		SetTemperature = *(float *)(pContext->pData);
+		sprintf(Temp_Temp,"%.2f",SetTemperature);
 		serialPutchar (fd,'T');
+		serialPuts(fd,Temp_Temp);
 		serialPuts (fd ,"\n");
 	}
 }
