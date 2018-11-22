@@ -52,7 +52,7 @@ bool ActiveState = false ;
 bool SelfTestInvoked = false ;
 bool EmergencyStop = false;
 float temperature = 30.0;
-float SetTemperature = 50.0;
+float SetTemperature = 25.0;
 float current = 2.0;
 int32_t TimeDate = 0 ;
 
@@ -78,6 +78,8 @@ volatile int Menu = 0;
 volatile int AutoMode = 0 ;
 volatile int MenuItem = 0;
 volatile int SelfTest = 0;
+volatile int Error = 0;
+volatile int Secret_Count = 0;
 volatile bool Power = false;
 volatile bool CloudConnection = false;
 volatile bool Transmit = false;
@@ -118,6 +120,7 @@ void EmergencyStop_Callback(const char *pJsonString, uint32_t JsonStringDataLen,
 void SetJSONHandlers();
 void parseInputArgsForConnectParams(int argc, char **argv);
 void Setup_OLED();
+int Setup_Serial();
 IoT_Error_t AWS_Setup();
 IoT_Error_t AWS_Shadow_Setup();
 IoT_Error_t AWS_Shadow_Reported_Send();
@@ -129,6 +132,8 @@ void Key2_Interrupt();
 void Key3_Interrupt();
 void KeyUp_Interrupt();
 void KeyDown_Interrupt();
+void KeyRight_Interrupt();
+void KeyPress_Interrupt();
 
 void GetTime();
 
@@ -178,6 +183,11 @@ PI_THREAD(SerialRead){
 	}
 	for(;;)
 	{
+		if ((fd = serialOpen ("/dev/ttyUSB0", 9600)) < 0)
+		{
+			fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
+			Error = 1;
+		}
 		int uartInputIndex = 0;
 		int Index = 0;
 		while (serialDataAvail(fd) > -1 && uartInputIndex < UART_INPUT_MAX_SIZE) {
@@ -239,14 +249,7 @@ PI_THREAD(SerialRead){
 }
 
 int main(int argc, char **argv) {
-	memset(uartInput, 0, UART_INPUT_MAX_SIZE+1);
-	if ((fd = serialOpen ("/dev/ttyUSB0", 9600)) < 0)
-	{
-		fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
-		return 1;
-	}
-	serialFlush(fd) ;
-	serialClose(fd);
+	Setup_Serial();
 	SetJSONHandlers();
 	AWS_Setup();
 	parseInputArgsForConnectParams(argc, argv);
@@ -289,6 +292,23 @@ int main(int argc, char **argv) {
 
 /*******************************************************************************/
 /* Functions Begin */
+int Setup_Serial(){
+	char Temp_Val[10] = "";
+	memset(uartInput, 0, UART_INPUT_MAX_SIZE+1);
+	if ((fd = serialOpen ("/dev/ttyUSB0", 9600)) < 0)
+	{
+		fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
+	}
+	serialFlush(fd) ;
+	serialPutchar (fd,'D');
+	serialPuts (fd ,"\n");
+	sprintf(Temp_Val,"%2.2f",SetTemperature);
+	serialPutchar (fd,'T');
+	serialPuts(fd,Temp_Val);
+	serialFlush(fd);
+	serialClose(fd);
+}
+
 void GetTime(){
 	OLED_Clear(OLED_BACKGROUND);
 	OLED_Display();
@@ -320,6 +340,10 @@ void GetTime(){
 	if (Transmit)
 	{
 		DrawComs();
+	}
+	if (Error == 1)
+	{
+		DrawError();
 	}
 	
 	DisTemp(temperature);
@@ -463,6 +487,7 @@ void Key3_Interrupt(){
 	if (Menu == 1)
 	{
 		Menu = 0;
+		Secret_Count = 0;
 		OLED_Clear(OLED_BACKGROUND);
 		OLED_Display();
 	}
@@ -492,6 +517,21 @@ void KeyDown_Interrupt(){
 	{
 		MenuPage2_Auto_Off(SetTemperature);
 		MenuItem = 1;
+	}
+}
+
+void KeyPress_Interrupt(){
+	if (Menu == 1 && Secret_Count == 3)
+	{
+		system("sudo shutdown -r now");
+	}
+	
+}
+
+void KeyRight_Interrupt(){
+	if (Menu == 1)
+	{
+		Secret_Count++;
 	}
 }
 
@@ -579,6 +619,14 @@ void SetupISR(){
 	if(wiringPiISR(KEY_DOWN_PIN, INT_EDGE_FALLING, &KeyDown_Interrupt) < 0)
 	{
                 printf("Unable to setup ISR KEY Down\n");
+	}
+	if(wiringPiISR(KEY_PRESS_PIN, INT_EDGE_FALLING, &KeyPress_Interrupt) < 0)
+	{
+                printf("Unable to setup ISR KEY Press\n");
+	}
+	if(wiringPiISR(KEY_RIGHT_PIN, INT_EDGE_FALLING, &KeyRight_Interrupt) < 0)
+	{
+                printf("Unable to setup ISR KEY Right\n");
 	}
 }
 
