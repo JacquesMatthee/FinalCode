@@ -34,7 +34,7 @@
 //#define ROOMTEMPERATURE_LOWERLIMIT 25.0f
 //#define STARTING_ROOMTEMPERATURE ROOMTEMPERATURE_LOWERLIMIT
 
-#define MAX_LENGTH_OF_UPDATE_JSON_BUFFER 200
+#define MAX_LENGTH_OF_UPDATE_JSON_BUFFER 512
 #define HOST_ADDRESS_SIZE 255
 /* Defnies End */ 
 /*******************************************************************************/
@@ -48,12 +48,12 @@ static uint32_t port = AWS_IOT_MQTT_PORT;
 static uint8_t numPubs = 5;
 
 // System Variables
-bool ActiveState = false ;
-bool SelfTestInvoked = false ;
-bool EmergencyStop = false;
-float temperature = 30.0;
-float SetTemperature = 25.0;
-float current = 2.0;
+/* volatile  */bool ActiveState = false ;
+/* volatile  */bool SelfTestInvoked = false ;
+/* volatile  */bool EmergencyStop = false;
+/* volatile  */float temperature = 30.0;
+/* volatile  */float SetTemperature = 25.0;
+/* volatile  */float current = 2.0;
 int32_t TimeDate = 0 ;
 
 // JSON Variables
@@ -89,9 +89,9 @@ int UART_INPUT_MAX_SIZE = 1024;
 char uartInput[1024];
 bool CharCurrent = false;
 bool CharTemp = false;
-char StrTemp[6];
-char StrCurrent[6];
-char strBuffer[20];
+char StrTemp[20];
+char StrCurrent[20];
+char strBuffer[40];
 
 
 /* Variables end */ 
@@ -143,6 +143,9 @@ float Total_Curr = 0.0;
 float Ave_Temp = 0.0;
 float Ave_Curr = 0.0;
 
+char Temp_Temp[20] = "";
+char Temp_Val[20] = "";
+
 /* Function Definitions End */
 /*******************************************************************************/
 
@@ -157,23 +160,25 @@ FILE *fp;
 int fd ;
 
 PI_THREAD(Shadow_Update){
-	
+	fp = fopen("Data.txt", "a+");
+		if(fp == NULL)
+		{
+			printf("Error opening file\n");
+			//return 1;
+		}
 	for (;;)
 	{
 		if (Menu == 0)
 		{
 			GetTime();
 		} 
-		fp = fopen("Data.txt", "a+");
-		if(fp == NULL)
-		{
-			printf("Error opening file\n");
-		}
+		
 		fwrite(JsonDocumentBuffer,sizeof(char),sizeof(JsonDocumentBuffer),fp);
 		fwrite("\n",sizeof(char),1,fp);
-		fclose (fp);
+		
 		delay(100);
 	}
+	fclose (fp);
 }
 
 PI_THREAD(SerialRead){
@@ -187,6 +192,7 @@ PI_THREAD(SerialRead){
 		{
 			fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
 			Error = 1;
+			
 		}
 		int uartInputIndex = 0;
 		int Index = 0;
@@ -222,7 +228,7 @@ PI_THREAD(SerialRead){
 					current = I;
 					Total_Curr += current;
 					Z++;
-					sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
+					//sprintf(strBuffer,"Temp value = %.2f\nCurrent value = %.2f\n",T,I);
 					//printf(strBuffer);
 					serialFlush(fd) ;
 				}
@@ -244,8 +250,9 @@ PI_THREAD(SerialRead){
     }
     if (0 == uartInputIndex) break; //No more strings received
 	//delay(100);
-	}
 	serialClose(fd);
+	}
+	
 }
 
 int main(int argc, char **argv) {
@@ -271,12 +278,14 @@ int main(int argc, char **argv) {
 	{
 		Ave_Temp = Total_Temp/Z;
 		Ave_Curr = Total_Curr/Z;
-		printf("Temp = %f",Ave_Temp);
+		//printf("Temp = %f",Ave_Temp);
+		//temperature = Ave_Temp;
+		//current =Ave_Curr;
 		AWS_Shadow_Reported_Send();
 		Total_Temp = 0.0;
 		Total_Curr = 0.0;
 		Z = 0;
-		delay(1000);
+		//delay(1000);
 	}
 	System_Exit();
 	IOT_INFO("Disconnecting");
@@ -293,7 +302,6 @@ int main(int argc, char **argv) {
 /*******************************************************************************/
 /* Functions Begin */
 int Setup_Serial(){
-	char Temp_Val[10] = "";
 	memset(uartInput, 0, UART_INPUT_MAX_SIZE+1);
 	if ((fd = serialOpen ("/dev/ttyUSB0", 9600)) < 0)
 	{
@@ -372,6 +380,7 @@ void Setup_OLED(){
 }
 
 IoT_Error_t AWS_Shadow_Reported_Send(){
+	JsonDocumentBuffer[0] = '\0';
 	if (NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc) 
 	{
 		Transmit = true;
@@ -688,7 +697,6 @@ void SelfTest_Callback(const char *pJsonString, uint32_t JsonStringDataLen, json
 void SetTemperature_Callback(const char *pJsonString, uint32_t JsonStringDataLen, jsonStruct_t *pContext) {
 	IOT_UNUSED(pJsonString);
 	IOT_UNUSED(JsonStringDataLen);
-	char Temp_Temp[10] = "";
 	if(pContext != NULL) {
 		IOT_INFO("Delta - Temperature changed to %f", *(float*)(pContext->pData));
 		SetTemperature = *(float *)(pContext->pData);
@@ -753,19 +761,18 @@ void SetJSONHandlers(){
 	CurrentHandler.dataLength = sizeof(float);
 	CurrentHandler.type = SHADOW_JSON_FLOAT;
 	
-	TimeHandler.cb = NULL;
+/* 	TimeHandler.cb = NULL;
 	TimeHandler.pKey = "SendDataAt";
 	TimeHandler.pData = &TimeDate;
 	TimeHandler.dataLength = sizeof(int32_t);
-	TimeHandler.type = SHADOW_JSON_INT32;
+	TimeHandler.type = SHADOW_JSON_INT32; */
 	
 	EmergencyStopHandler.cb = EmergencyStop_Callback;
 	EmergencyStopHandler.pData = &EmergencyStop;
 	EmergencyStopHandler.dataLength = sizeof(bool);
 	EmergencyStopHandler.pKey = "EmergencyStop";
 	EmergencyStopHandler.type = SHADOW_JSON_BOOL;
-	
-	
+		
 }
 
 void parseInputArgsForConnectParams(int argc, char **argv) {
